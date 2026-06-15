@@ -1,0 +1,13 @@
+{
+    "name": "hexlet/code",
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "require": {
+        "php" : ">=8.3",
+        "squizlabs/php_codesniffer": "^4.0",
+        "slim/slim": "^4.9"
+    }
+}
