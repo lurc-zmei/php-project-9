@@ -9,10 +9,9 @@ RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
     && php -r "unlink('composer-setup.php');"
 
 WORKDIR /app
-
-COPY . .
-
+COPY composer.json composer.lock ./
 RUN composer install
+COPY . .
 
 # CMD ["bash", "-c", "make start"]
 EXPOSE 8000

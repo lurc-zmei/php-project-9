@@ -6,8 +6,11 @@
         }
     },
     "require": {
-        "php" : ">=8.3",
-        "squizlabs/php_codesniffer": "^4.0",
-        "slim/slim": "^4.9"
+        "slim/slim": "^4.15",
+        "slim/php-view": "^3.4",
+        "slim/psr7": "^1.8"
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "^4.0"
     }
 }
