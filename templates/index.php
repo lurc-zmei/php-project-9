@@ -9,3 +9,25 @@
         <?php endforeach; ?>
     </ul>
 <?php endif; ?>
+
+
+
+Ключевая разметка таблицы со списком URL
+<table data-test="urls">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Имя</th>
+      <th>Дата создания</th>
+      <th>Код ответа</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><a href="/urls/1">https://example.com</a></td>
+      <td>2024-01-01</td>
+      <td>200</td>
+    </tr>
+  </tbody>
+</table>
