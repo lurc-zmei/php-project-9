@@ -8,16 +8,31 @@
  <body class="d-flex flex-column min-vh-100">
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid d-flex flex-wrap align-items-center">
-        <a class="navbar-brand mb-0" href="/">Анализатор страниц</a>
-        <a class="nav-link mb-0 ms-3 link-light link-opacity-75" href="/urls">Сайты</a>
+    <div class="container-fluid justify-content-start">
+        <a class="navbar-brand" href="/">Анализатор страниц</a>
+        <a class="nav-link link-light link-opacity-75" href="/urls">Сайты</a>
     </div>
 </nav>
 
 
 <main class="flex-grow-1">
-    <?= $content ?>
-</main>
+        <?php if (!empty($flash)): ?>
+            <div class="container mt-3">
+                <?php foreach ($flash as $type => $messages): ?>
+                    <?php foreach ($messages as $message): ?>
+                        <div class="alert alert-<?= htmlspecialchars($type) ?> fade show" role="alert">
+                            <?= htmlspecialchars($message) ?>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+
+
+        <div class="container-lg mt-3">
+            <?= $content ?>
+        </div>
+    </main>
 
     
 <hr class="border-secondary-subtle mb-0">
