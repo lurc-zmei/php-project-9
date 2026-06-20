@@ -1,3 +1,4 @@
+
 services:
   nginx:
     container_name: nginx
@@ -12,8 +13,6 @@ services:
     depends_on:
       - php
       - postgres
-
-
 
 
   postgres:
@@ -44,7 +43,6 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: postgres
 
-
   
   php:
     container_name: php
@@ -52,11 +50,11 @@ services:
     image: php
     volumes:
       - .:/var/www/public_html
+    command: sh -c "composer install --no-interaction && php-fpm"
     depends_on:
       - postgres
     networks:
       - network
-
 
 
 networks:
@@ -65,3 +63,4 @@ networks:
 
 volumes:
   postgres-data:
+

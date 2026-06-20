@@ -8,6 +8,3 @@ RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
     && php -r "unlink('composer-setup.php');"
 
 WORKDIR /var/www/public_html
-COPY composer.json composer.lock ./
-RUN composer install
-COPY . .
