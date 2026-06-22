@@ -44,7 +44,11 @@ $app->get('/', function (Request $request, Response $response) use ($container) 
 
 
 $app->get('/urls', function (Request $request, Response $response) use ($container) {
-    return $container->get(PhpRenderer::class)->render($response, 'index.php');
+    $pdo = $container->get(PDO::class);
+    $sql = 'SELECT * FROM urls ORDER BY id DESC';
+    $stmt = $pdo->query($sql);
+    $rows = $stmt->fetchAll();
+    return $container->get(PhpRenderer::class)->render($response, 'index.php', compact('rows')); //['rows' => $rows]
 })->setName('urls.index');
 
 
