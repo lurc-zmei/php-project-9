@@ -11,7 +11,7 @@
                            type="text"
                            id="url"
                            name="url"
-                           value=""
+                           value="<?= htmlspecialchars($oldInput['url'] ?? '') ?>"
                            placeholder="https://www.example.com">
                 </div>
                 <div class="col-2">
