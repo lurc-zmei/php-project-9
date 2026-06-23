@@ -6,10 +6,8 @@ use Slim\Factory\AppFactory;
 use DI\Container;
 use Slim\Views\PhpRenderer;
 use Dotenv\Dotenv;
-use FastRoute\Route;
 use Valitron\Validator;
-
-use function DI\get;
+use Carbon\Carbon;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -53,7 +51,7 @@ $app->get('/', function (Request $request, Response $response) use ($container) 
     $messages = $flash->getMessages();
     $oldInput = $_SESSION['old_input'] ?? [];
     unset($_SESSION['old_input']);
-    return $container->get(PhpRenderer::class)->render($response,'home.php', ['flash' => $messages, 'oldInput' => $oldInput]);
+    return $container->get(PhpRenderer::class)->render($response, 'home.php', ['flash' => $messages, 'oldInput' => $oldInput]);
 })->setName('home');
 
 
@@ -62,7 +60,13 @@ $app->get('/urls', function (Request $request, Response $response) use ($contain
     $sql = 'SELECT * FROM urls ORDER BY id DESC';
     $stmt = $pdo->query($sql);
     $rows = $stmt->fetchAll();
-    return $container->get(PhpRenderer::class)->render($response, 'index.php', compact('rows')); //['rows' => $rows]
+
+    foreach ($rows as &$row) {
+        $row['created_at'] = Carbon::parse($row['created_at'])->format('Y-m-d');
+    }
+    unset($row);
+
+    return $container->get(PhpRenderer::class)->render($response, 'index.php', compact('rows'));
 })->setName('urls.index');
 
 
@@ -83,10 +87,9 @@ $app->post('/', function (Request $request, Response $response) use ($container)
 
         foreach ($errors['url'] as $error) {
             $flash->addMessage('danger', $error);
-            }
-            return $response->withHeader('Location', '/')->withStatus(302);
+        }
+        return $response->withHeader('Location', '/')->withStatus(302);
     }
-
 
     $sql = 'SELECT id FROM urls WHERE name = :url';
     $stmt = $pdo->prepare($sql);
@@ -94,32 +97,40 @@ $app->post('/', function (Request $request, Response $response) use ($container)
     $urlExist = $stmt->fetch();
 
     if ($urlExist) {
-        $flash->addMessage('warning', 'Страница уже существует');
-        $_SESSION['old_input'] = ['url' => $url];
-        return $response->withHeader('Location', '/')->withStatus(302);
-    }
+        $isDuplicate = true;
+    } else {
 
-    $sql = 'INSERT INTO urls (name) VALUES (:url)';
-    $stmt = $pdo->prepare($sql);
+        $sql = 'INSERT INTO urls (name, created_at) VALUES (:url, :created_at)';
+        $stmt = $pdo->prepare($sql);
 
-    try {
-        $stmt->execute(['url' => $url]);
-        $flash->addMessage('success', 'Страница успешно добавлена');
-        unset($_SESSION['old_input']);
-    } catch (\PDOException $e) {
-        if ($e->getCode() == 23505) {
-            $flash->addMessage('warning', 'Страница уже существует');
-            $_SESSION['old_input'] = ['url' => $url];
-        } else {
-            $flash->addMessage('danger', 'Произошла ошибка при добавлении');
+        try {
+            $stmt->execute([
+                'url' => $url,
+                'created_at' => Carbon::now()
+            ]);
+            $flash->addMessage('success', 'Страница успешно добавлена');
+            unset($_SESSION['old_input']);
+            $isDuplicate = false;
+        } catch (\PDOException $e) {
+            if ($e->getCode() === '23505') {
+                $isDuplicate = true;
+            } else {
+                $flash->addMessage('danger', 'Произошла ошибка при добавлении');
+                $isDuplicate = false;
+            }
         }
     }
-    
+
+    if ($isDuplicate) {
+        $flash->addMessage('warning', 'Страница уже существует');
+        $_SESSION['old_input'] = ['url' => $url];
+    }
+
     return $response->withHeader('Location', '/')->withStatus(302);
 });
 
 
-$app->get('/urls/{id}', function(Request $request, Response $response, array $args) use($container) {
+$app->get('/urls/{id}', function (Request $request, Response $response, array $args) use ($container) {
     $id = $args['id'];
     $pdo = $container->get(PDO::class);
 
@@ -132,8 +143,9 @@ $app->get('/urls/{id}', function(Request $request, Response $response, array $ar
         throw new \Slim\Exception\HttpNotFoundException($request);
     }
 
-    return $container->get(PhpRenderer::class)->render($response, 'show.php', compact('url'));
+    $url['created_at'] = Carbon::parse($url['created_at'])->format('Y-m-d');
 
+    return $container->get(PhpRenderer::class)->render($response, 'show.php', compact('url'));
 })->setName('urls.show');
 
 $app->run();
