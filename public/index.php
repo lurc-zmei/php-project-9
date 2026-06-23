@@ -6,7 +6,10 @@ use Slim\Factory\AppFactory;
 use DI\Container;
 use Slim\Views\PhpRenderer;
 use Dotenv\Dotenv;
+use FastRoute\Route;
 use Valitron\Validator;
+
+use function DI\get;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -65,13 +68,13 @@ $app->get('/urls', function (Request $request, Response $response) use ($contain
 
 $app->post('/', function (Request $request, Response $response) use ($container) {
     $data = $request->getParsedBody();
-    $url = $data['url'] ?? '';
+    $url = trim($data['url'] ?? '');
     $pdo = $container->get(PDO::class);
     $flash = $container->get('flash');
 
     $validator = new Validator(['url' => $url]);
     $validator->rule('required', 'url')->message('URL не должен быть пустым');
-    $validator->rule('lengthMax', 255)->message('URL превышает 255 символов');
+    $validator->rule('lengthMax', 'url', 255)->message('URL превышает 255 символов');
     $validator->rule('url', 'url')->message('Некорректный URL');
 
     if (!$validator->validate()) {
@@ -82,6 +85,18 @@ $app->post('/', function (Request $request, Response $response) use ($container)
             $flash->addMessage('danger', $error);
             }
             return $response->withHeader('Location', '/')->withStatus(302);
+    }
+
+
+    $sql = 'SELECT id FROM urls WHERE name = :url';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(['url' => $url]);
+    $urlExist = $stmt->fetch();
+
+    if ($urlExist) {
+        $flash->addMessage('warning', 'Страница уже существует');
+        $_SESSION['old_input'] = ['url' => $url];
+        return $response->withHeader('Location', '/')->withStatus(302);
     }
 
     $sql = 'INSERT INTO urls (name) VALUES (:url)';
@@ -102,5 +117,23 @@ $app->post('/', function (Request $request, Response $response) use ($container)
     
     return $response->withHeader('Location', '/')->withStatus(302);
 });
+
+
+$app->get('/urls/{id}', function(Request $request, Response $response, array $args) use($container) {
+    $id = $args['id'];
+    $pdo = $container->get(PDO::class);
+
+    $sql = 'SELECT * FROM urls WHERE id = :id';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(['id' => $id]);
+    $url = $stmt->fetch();
+
+    if (!$url) {
+        throw new \Slim\Exception\HttpNotFoundException($request);
+    }
+
+    return $container->get(PhpRenderer::class)->render($response, 'show.php', compact('url'));
+
+})->setName('urls.show');
 
 $app->run();
