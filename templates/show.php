@@ -41,5 +41,21 @@
         </tr>
     </thead>
     <tbody>
+        <?php if (empty($checks)): ?>
+            <tr>
+                <td colspan="6" class="text-center">Проверок пока нет</td>
+            </tr>
+        <?php else: ?>
+            <?php foreach ($checks as $check): ?>
+                <tr>
+                    <td><?= $check['id'] ?></td>
+                    <td><?= $check['status_code'] ?? '' ?></td>
+                    <td><?= htmlspecialchars($check['h1']) ?></td>
+                    <td><?= htmlspecialchars($check['title']) ?></td>
+                    <td><?= htmlspecialchars($check['description']) ?></td>
+                    <td><?= htmlspecialchars($check['created_at']) ?></td>
+                </tr>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </tbody>
 </table>
