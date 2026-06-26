@@ -49,14 +49,15 @@ $app->addErrorMiddleware(true, false, false);
 $app->get('/', function (Request $request, Response $response) use ($container) {
     $flash = $container->get('flash');
     $messages = $flash->getMessages();
-    $oldInput = $_SESSION['old_input'] ?? [];
-    unset($_SESSION['old_input']);
+    $oldInput = $messages['old_input'][0] ?? [];
     return $container->get(PhpRenderer::class)->render($response, 'home.php', ['flash' => $messages, 'oldInput' => $oldInput]);
 })->setName('home');
 
 
 $app->get('/urls', function (Request $request, Response $response) use ($container) {
     $pdo = $container->get(PDO::class);
+    $flash = $container->get('flash');
+    $messages = $flash->getMessages();
 
     $sql = 'SELECT * FROM urls ORDER BY id DESC';
     $stmt = $pdo->query($sql);
@@ -66,7 +67,7 @@ $app->get('/urls', function (Request $request, Response $response) use ($contain
         $rows[$key]['created_at'] = formatDate($row['created_at']);
     }
 
-    return $container->get(PhpRenderer::class)->render($response, 'index.php', compact('rows'));
+    return $container->get(PhpRenderer::class)->render($response, 'index.php', ['rows' => $rows, 'flash' => $messages]);
 })->setName('urls.index');
 
 
@@ -83,8 +84,7 @@ $app->post('/', function (Request $request, Response $response) use ($container)
 
     if (!$validator->validate()) {
         $errors = $validator->errors();
-        $_SESSION['old_input'] = ['url' => $url];
-
+        $flash->addMessage('old_input', $url);
         foreach ($errors['url'] as $error) {
             $flash->addMessage('danger', $error);
         }
@@ -97,47 +97,47 @@ $app->post('/', function (Request $request, Response $response) use ($container)
     $urlExist = $stmt->fetch();
 
     if ($urlExist) {
-        $isDuplicate = true;
-    } else {
+        $flash->addMessage('warning', 'Страница уже существует');
+        return $response->withHeader('Location', '/urls/' . $urlExist['id'])->withStatus(302);
+    }
+
+
+    try {
         $sql = 'INSERT INTO urls (name, created_at) VALUES (:url, :created_at)';
         $stmt = $pdo->prepare($sql);
-
-        try {
-            $stmt->execute([
-                'url' => $url,
-                'created_at' => Carbon::now()
-            ]);
-            $flash->addMessage('success', 'Страница успешно добавлена');
-            unset($_SESSION['old_input']);
-            $isDuplicate = false;
-        } catch (\PDOException $e) {
-            if ($e->getCode() === '23505') {
-                $isDuplicate = true;
-            } else {
-                $flash->addMessage('danger', 'Произошла ошибка при добавлении');
-                $isDuplicate = false;
-            }
+        $stmt->execute([
+            'url' => $url,
+            'created_at' => Carbon::now()
+        ]);
+        $newId = $pdo->lastInsertId();
+        $flash->addMessage('success', 'Страница успешно добавлена');
+        return $response->withHeader('Location', '/urls/' . $newId)->withStatus(302);
+    } catch (\PDOException $e) {
+        if ($e->getCode() === '23505') {
+            $stmt = $pdo->prepare('SELECT id FROM urls WHERE name = :url');
+            $stmt->execute(['url' => $url]);
+            $existing = $stmt->fetch();
+            $flash->addMessage('warning', 'Страница уже существует');
+            return $response->withHeader('Location', '/urls/' . $existing['id'])->withStatus(302);
         }
+        $flash->addMessage('danger', 'Произошла ошибка при добавлении');
+        $flash->addMessage('old_input', $url);
+        return $response->withHeader('Location', '/')->withStatus(302);
     }
-
-    if ($isDuplicate) {
-        $flash->addMessage('warning', 'Страница уже существует');
-        $_SESSION['old_input'] = ['url' => $url];
-    }
-
-    return $response->withHeader('Location', '/')->withStatus(302);
 });
 
 
 $app->get('/urls/{id:[0-9]+}', function (Request $request, Response $response, array $args) use ($container) {
     $id = $args['id'];
     $pdo = $container->get(PDO::class);
+    $flash = $container->get('flash');
+    $messages = $flash->getMessages();
 
     $sql = 'SELECT * FROM urls WHERE id = :id';
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['id' => $id]);
     $url = $stmt->fetch();
-    
+
     if (!$url) {
         throw new \Slim\Exception\HttpNotFoundException($request);
     }
@@ -156,7 +156,11 @@ $app->get('/urls/{id:[0-9]+}', function (Request $request, Response $response, a
         $checks[$key]['description'] = truncate($check['description']);
     }
 
-    return $container->get(PhpRenderer::class)->render($response, 'show.php', compact('url', 'checks'));
+    return $container->get(PhpRenderer::class)->render($response, 'show.php', [
+        'url' => $url,
+        'checks' => $checks,
+        'flash' => $messages
+    ]);
 })->setName('urls.show');
 
 
