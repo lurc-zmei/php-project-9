@@ -8,6 +8,8 @@ use Slim\Views\PhpRenderer;
 use Dotenv\Dotenv;
 use Valitron\Validator;
 use Carbon\Carbon;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -39,6 +41,10 @@ $container->set(PDO::class, function () {
     }
 });
 
+$container->set(Client::class, function () {
+    return new Client(['timeout' => 5,'connect_timeout' => 5]);
+});
+
 
 AppFactory::setContainer($container);
 $app = AppFactory::create();
@@ -59,7 +65,23 @@ $app->get('/urls', function (Request $request, Response $response) use ($contain
     $flash = $container->get('flash');
     $messages = $flash->getMessages();
 
-    $sql = 'SELECT * FROM urls ORDER BY id DESC';
+    $sql = 'SELECT
+                urls.id,
+                urls.name,
+                urls.created_at,
+                url_checks.status_code AS last_status_code,
+                url_checks.created_at AS last_check_created_at
+            FROM urls
+            LEFT JOIN (
+                SELECT DISTINCT ON (url_id) 
+                    url_id, 
+                    status_code, 
+                    created_at
+                FROM url_checks
+                ORDER BY url_id, id DESC
+            ) url_checks ON urls.id = url_checks.url_id
+            ORDER BY id DESC';
+    
     $stmt = $pdo->query($sql);
     $rows = $stmt->fetchAll();
 
@@ -76,6 +98,12 @@ $app->post('/', function (Request $request, Response $response) use ($container)
     $url = trim($data['url'] ?? '');
     $pdo = $container->get(PDO::class);
     $flash = $container->get('flash');
+
+    if (parse_url($url, PHP_URL_SCHEME) === null) {
+        $url = 'https://' . $url;
+    }
+
+    $url = rtrim($url, '/');
 
     $validator = new Validator(['url' => $url]);
     $validator->rule('required', 'url')->message('URL не должен быть пустым');
@@ -97,7 +125,7 @@ $app->post('/', function (Request $request, Response $response) use ($container)
     $urlExist = $stmt->fetch();
 
     if ($urlExist) {
-        $flash->addMessage('warning', 'Страница уже существует');
+        $flash->addMessage('success', 'Страница уже существует');
         return $response->withHeader('Location', '/urls/' . $urlExist['id'])->withStatus(302);
     }
 
@@ -168,26 +196,58 @@ $app->post('/urls/{url_id:[0-9]+}/checks', function (Request $request, Response 
     $id = $args['url_id'];
     $pdo = $container->get(PDO::class);
     $flash = $container->get('flash');
+    $client = $container->get(Client::class);
 
-    $sql = 'SELECT id FROM urls WHERE id = :id';
+    $sql = 'SELECT id, name FROM urls WHERE id = :id';
     $stmt = $pdo->prepare($sql);
     $stmt->execute(['id' => $id]);
-    $url = $stmt->fetch();
+    $urlData = $stmt->fetch();
 
-    if (!$url) {
+    if (!$urlData) {
         throw new \Slim\Exception\HttpNotFoundException($request);
     }
 
+    $url = $urlData['name'];
+
     try {
-        $sql = 'INSERT INTO url_checks (url_id, created_at) VALUES (:url_id, :created_at)';
+        $httpResponse = $client->get($url, ['stream' => true,'read_timeout' => 5]);
+        $statusCode = $httpResponse->getStatusCode();
+
+        $body = $httpResponse->getBody();
+        $html = $body->read(500000);
+        $body->close();
+
+        libxml_use_internal_errors(true);
+        $doc = new DOMDocument();
+        $doc->loadHTML($html);
+        $xpath = new DOMXPath($doc);
+
+        $titleNode = $xpath->query('//title')->item(0);
+        $h1Node    = $xpath->query('//h1')->item(0);
+        $descNode  = $xpath->query('//meta[@name="description"]/@content')->item(0);
+
+        $meta = [
+            'title'       => $titleNode ? trim($titleNode->textContent) : null,
+            'h1'          => $h1Node    ? trim($h1Node->textContent)    : null,
+            'description' => $descNode  ? trim($descNode->nodeValue)     : null,
+        ];
+
+
+
+        $sql = 'INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
+                VALUES (:url_id, :status_code, :h1, :title, :description, :created_at)';
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
-            'url_id' => $id,
-            'created_at' => Carbon::now()
+            'url_id'      => $id,
+            'status_code' => $statusCode,
+            'h1'          => truncate($meta['h1']),
+            'title'       => truncate($meta['title']),
+            'description' => truncate($meta['description']),
+            'created_at'  => Carbon::now(),
         ]);
 
         $flash->addMessage('success', 'Страница успешно проверена');
-    } catch (\PDOException $e) {
+    } catch (GuzzleException $e) {
         $flash->addMessage('danger', 'Произошла ошибка при проверке, не удалось подключиться');
     }
 
@@ -195,7 +255,7 @@ $app->post('/urls/{url_id:[0-9]+}/checks', function (Request $request, Response 
 })->setName('urls.checks');
 
 
-function formatDate($date)
+function formatDate(string $date)
 {
     return $date ? Carbon::parse($date)->format('Y-m-d') : null;
 }

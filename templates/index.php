@@ -20,7 +20,7 @@
             <a href="/urls/<?= $row['id'] ?>" aria-label="Просмотр сайта <?= htmlspecialchars($row['name']) ?>"><?= htmlspecialchars($row['name']) ?></a>
           </td>
           <td><?= htmlspecialchars($row['created_at']) ?></td>
-          <td>200</td>
+          <td><?= htmlspecialchars($row['last_status_code'] ?? '') ?></td>
         </tr>
       <?php endforeach; ?>
     <?php endif; ?>
