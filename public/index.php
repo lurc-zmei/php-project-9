@@ -10,6 +10,7 @@ use Valitron\Validator;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use Symfony\Component\DomCrawler\Crawler;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -217,22 +218,13 @@ $app->post('/urls/{url_id:[0-9]+}/checks', function (Request $request, Response 
         $html = $body->read(500000);
         $body->close();
 
-        libxml_use_internal_errors(true);
-        $doc = new DOMDocument();
-        $doc->loadHTML($html);
-        $xpath = new DOMXPath($doc);
+        $crawler = new Crawler();
+        $crawler->addHtmlContent($html, 'UTF-8');
 
-        $titleNode = $xpath->query('//title')->item(0);
-        $h1Node    = $xpath->query('//h1')->item(0);
-        $descNode  = $xpath->query('//meta[@name="description"]/@content')->item(0);
-
-        $meta = [
-            'title'       => $titleNode ? trim($titleNode->textContent) : null,
-            'h1'          => $h1Node    ? trim($h1Node->textContent)    : null,
-            'description' => $descNode  ? trim($descNode->nodeValue)     : null,
-        ];
-
-
+        $title = trim($crawler->filter('title')->text(''));
+        $h1 = trim($crawler->filter('h1')->text(''));
+        $descNode = $crawler->filterXPath('//meta[translate(@name, "DESCRIPTION", "description")="description"]');
+        $description = $descNode->count() > 0 ? trim($descNode->attr('content') ?? '') : '';
 
         $sql = 'INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
                 VALUES (:url_id, :status_code, :h1, :title, :description, :created_at)';
@@ -240,9 +232,9 @@ $app->post('/urls/{url_id:[0-9]+}/checks', function (Request $request, Response 
         $stmt->execute([
             'url_id'      => $id,
             'status_code' => $statusCode,
-            'h1'          => truncate($meta['h1']),
-            'title'       => truncate($meta['title']),
-            'description' => truncate($meta['description']),
+            'h1'          => truncate($h1),
+            'title'       => truncate($title),
+            'description' => truncate($description),
             'created_at'  => Carbon::now(),
         ]);
 
