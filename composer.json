@@ -3,7 +3,10 @@
     "autoload": {
         "psr-4": {
             "App\\": "src/"
-        }
+        },
+        "files": [
+            "helpers.php"
+        ]
     },
     "require": {
         "slim/slim": "^4.15",
