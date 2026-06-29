@@ -65,7 +65,10 @@ return function ($app, $container) {
             $url = 'https://' . $url;
         }
 
-        $url = rtrim($url, '/');
+        $parsedUrl = parse_url($url);
+        $scheme = $parsedUrl['scheme'] ?? 'https';
+        $host = $parsedUrl['host'] ?? '';
+        $url = strtolower("{$scheme}://{$host}");
 
         $validator = new Validator(['url' => $url]);
         $validator->rule('required', 'url')->message('URL не должен быть пустым');
