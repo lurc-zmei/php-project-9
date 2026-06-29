@@ -14,6 +14,8 @@ return function ($app, $container) {
         $flash = $container->get('flash');
         $messages = $flash->getMessages();
         $oldInput = $messages['old_input'][0] ?? [];
+        unset($messages['old_input']);
+
         return $container->get(PhpRenderer::class)->render($response, 'home.php', [
             'flash' => $messages,
             'oldInput' => $oldInput
@@ -55,7 +57,7 @@ return function ($app, $container) {
     })->setName('urls.index');
 
 
-    $app->post('/', function (Request $request, Response $response) use ($container) {
+    $app->post('/urls', function (Request $request, Response $response) use ($container) {
         $data = $request->getParsedBody();
         $url = trim($data['url'] ?? '');
         $pdo = $container->get(PDO::class);
@@ -114,7 +116,7 @@ return function ($app, $container) {
                 return $response->withHeader('Location', '/urls/' . $existing['id'])->withStatus(302);
             }
             $flash->addMessage('danger', 'Произошла ошибка при добавлении');
-            $flash->addMessage('old_input', $url);
+            $flash->addMessage('old_input', ['url' => $url]);
             return $response->withHeader('Location', '/')->withStatus(302);
         }
     });
