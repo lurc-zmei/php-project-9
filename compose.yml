@@ -50,6 +50,10 @@ services:
     image: php
     volumes:
       - .:/var/www/public_html
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=postgres
     command: sh -c "composer install --no-interaction && php-fpm"
     depends_on:
       - postgres
