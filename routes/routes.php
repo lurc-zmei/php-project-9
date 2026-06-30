@@ -105,7 +105,7 @@ return function ($app, $container) {
                 'created_at' => Carbon::now()
             ]);
             $newId = $pdo->lastInsertId();
-            $flash->addMessage('success', 'Страница успешно добавлена');
+            $flash->addMessage('success', "Страница успешно добавлена");
             return $response->withHeader('Location', '/urls/' . $newId)->withStatus(302);
         } catch (\PDOException $e) {
             if ($e->getCode() === '23505') {
