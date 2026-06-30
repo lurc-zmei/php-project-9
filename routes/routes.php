@@ -127,6 +127,7 @@ return function ($app, $container) {
         $pdo = $container->get(PDO::class);
         $flash = $container->get('flash');
         $messages = $flash->getMessages();
+        unset($messages['old_input']);
 
         $sql = 'SELECT * FROM urls WHERE id = :id';
         $stmt = $pdo->prepare($sql);

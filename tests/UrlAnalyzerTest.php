@@ -80,7 +80,7 @@ class UrlAnalyzerTest extends TestCase
 
     public function testPostInvalidUrl(): void
     {
-        $request = (new ServerRequestFactory())->createServerRequest('POST', '/')
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/urls')
             ->withParsedBody(['url' => 'not-a-valid-url']);
 
         $response = $this->app->handle($request);
