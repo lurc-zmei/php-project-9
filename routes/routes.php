@@ -26,7 +26,6 @@ return function ($app, $container) {
     $app->get('/urls', function (Request $request, Response $response) use ($container) {
         $pdo = $container->get(PDO::class);
         $flash = $container->get('flash');
-        $messages = $flash->getMessages();
 
         $sql = 'SELECT
                 urls.id,
@@ -53,7 +52,7 @@ return function ($app, $container) {
         }
 
         return $container->get(PhpRenderer::class)
-            ->render($response, 'index.php', ['rows' => $rows, 'flash' => $messages]);
+            ->render($response, 'index.php', ['rows' => $rows, 'flash' => $flash]);
     })->setName('urls.index');
 
 
@@ -105,7 +104,7 @@ return function ($app, $container) {
                 'created_at' => Carbon::now()
             ]);
             $newId = $pdo->lastInsertId();
-            $flash->addMessage('success', "Страница успешно добавлена");
+            $flash->addMessage('success', 'Страница успешно добавлена');
             return $response->withHeader('Location', '/urls/' . $newId)->withStatus(302);
         } catch (\PDOException $e) {
             if ($e->getCode() === '23505') {
@@ -126,8 +125,6 @@ return function ($app, $container) {
         $id = $args['id'];
         $pdo = $container->get(PDO::class);
         $flash = $container->get('flash');
-        $messages = $flash->getMessages();
-        unset($messages['old_input']);
 
         $sql = 'SELECT * FROM urls WHERE id = :id';
         $stmt = $pdo->prepare($sql);
@@ -155,7 +152,7 @@ return function ($app, $container) {
         return $container->get(PhpRenderer::class)->render($response, 'show.php', [
             'url' => $url,
             'checks' => $checks,
-            'flash' => $messages
+            'flash' => $flash
         ]);
     })->setName('urls.show');
 

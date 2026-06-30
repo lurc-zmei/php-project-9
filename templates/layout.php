@@ -18,16 +18,19 @@
 
 
     <main class="flex-grow-1">
-        <?php if (!empty($flash)): ?>
-            <div class="container mt-3">
-                <?php foreach ($flash as $type => $messages): ?>
-                    <?php foreach ($messages as $message): ?>
-                        <div class="alert alert-<?= htmlspecialchars($type) ?> fade show" role="alert">
-                            <?= htmlspecialchars($message) ?>
-                        </div>
+        <?php if (isset($flash) && $flash instanceof \Slim\Flash\Messages): ?>
+            <?php $messages = $flash->getMessages(); ?>
+            <?php if (!empty($messages)): ?>
+                <div class="container mt-3">
+                    <?php foreach ($messages as $type => $msgs): ?>
+                        <?php foreach ($msgs as $msg): ?>
+                            <div class="alert alert-<?= htmlspecialchars($type) ?> fade show" role="alert">
+                                <?= htmlspecialchars($msg) ?>
+                            </div>
+                        <?php endforeach; ?>
                     <?php endforeach; ?>
-                <?php endforeach; ?>
-            </div>
+                </div>
+            <?php endif; ?>
         <?php endif; ?>
 
 
