@@ -26,7 +26,7 @@ COPY . .
 
 RUN chown -R www-data:www-data /var/www/public_html
 
-EXPOSE 80
+EXPOSE 8080
 
 COPY php/www.conf /usr/local/etc/php-fpm.d/www.conf
 
