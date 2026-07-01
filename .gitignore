@@ -5,3 +5,4 @@
 info.txt
 .env
 .phpunit.cache/
+/build
