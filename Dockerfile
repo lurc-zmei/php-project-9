@@ -27,4 +27,7 @@ COPY . .
 RUN chown -R www-data:www-data /var/www/public_html
 
 EXPOSE 80
+
+COPY php/www.conf /usr/local/etc/php-fpm.d/www.conf
+
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
