@@ -10,22 +10,28 @@ use Symfony\Component\DomCrawler\Crawler;
 use Carbon\Carbon;
 
 return function ($app, $container) {
-    $app->get('/', function (Request $request, Response $response) use ($container) {
+    $getFlashData = function ($container) {
         $flash = $container->get('flash');
         $messages = $flash->getMessages();
-        $oldInput = $messages['old_input'][0] ?? [];
+        $oldInput = $messages['old_input'][0] ?? '';
         unset($messages['old_input']);
+        return [$messages, $oldInput];
+    };
+
+    $app->get('/', function (Request $request, Response $response) use ($container, $getFlashData) {
+        [$flash, $oldInput] = $getFlashData($container);
 
         return $container->get(PhpRenderer::class)->render($response, 'home.php', [
-            'flash' => $messages,
-            'oldInput' => $oldInput
+            'flash' => $flash,
+            'oldInput' => $oldInput,
+            'errors' => []
         ]);
     })->setName('home');
 
 
-    $app->get('/urls', function (Request $request, Response $response) use ($container) {
+    $app->get('/urls', function (Request $request, Response $response) use ($container, $getFlashData) {
+        [$flash] = $getFlashData($container);
         $pdo = $container->get(PDO::class);
-        $flash = $container->get('flash');
 
         $sql = 'SELECT
                 urls.id,
@@ -59,31 +65,35 @@ return function ($app, $container) {
     $app->post('/urls', function (Request $request, Response $response) use ($container) {
         $data = $request->getParsedBody();
         $url = trim($data['url'] ?? '');
-        $pdo = $container->get(PDO::class);
-        $flash = $container->get('flash');
 
         if (parse_url($url, PHP_URL_SCHEME) === null) {
             $url = 'https://' . $url;
+        }
+
+        $pdo = $container->get(PDO::class);
+        $flash = $container->get('flash');
+
+        $validator = new Validator(['url' => $url]);
+        $validator->rule('required', 'url')->message('URL не должен быть пустым');
+        $validator->rule('lengthMax', 'url', 255)->message('URL превышает 255 символов');
+        $validator->rule('url', 'url')->message('Некорректный URL');
+        $validator->rule('regex', 'url', '/^https?:\/\/[^\s]+\.[a-z]{2,}(\/.*)?$/i')
+            ->message('URL должен содержать доменную зону (например, .com, .ru)');
+
+
+        if (!$validator->validate()) {
+            $errors = $validator->errors();
+            return $container->get(PhpRenderer::class)
+                ->render($response->withStatus(422), 'home.php', [
+                    'errors' => $errors,
+                    'oldInput' => $url
+                ]);
         }
 
         $parsedUrl = parse_url($url);
         $scheme = $parsedUrl['scheme'] ?? 'https';
         $host = $parsedUrl['host'] ?? '';
         $url = strtolower("{$scheme}://{$host}");
-
-        $validator = new Validator(['url' => $url]);
-        $validator->rule('required', 'url')->message('URL не должен быть пустым');
-        $validator->rule('lengthMax', 'url', 255)->message('URL превышает 255 символов');
-        $validator->rule('url', 'url')->message('Некорректный URL');
-
-        if (!$validator->validate()) {
-            $errors = $validator->errors();
-            $flash->addMessage('old_input', $url);
-            foreach ($errors['url'] as $error) {
-                $flash->addMessage('danger', $error);
-            }
-            return $response->withHeader('Location', '/')->withStatus(302);
-        }
 
         $sql = 'SELECT id FROM urls WHERE name = :url';
         $stmt = $pdo->prepare($sql);
@@ -94,7 +104,6 @@ return function ($app, $container) {
             $flash->addMessage('success', 'Страница уже существует');
             return $response->withHeader('Location', '/urls/' . $urlExist['id'])->withStatus(302);
         }
-
 
         try {
             $sql = 'INSERT INTO urls (name, created_at) VALUES (:url, :created_at)';
@@ -115,16 +124,16 @@ return function ($app, $container) {
                 return $response->withHeader('Location', '/urls/' . $existing['id'])->withStatus(302);
             }
             $flash->addMessage('danger', 'Произошла ошибка при добавлении');
-            $flash->addMessage('old_input', ['url' => $url]);
+            $flash->addMessage('old_input', $url);
             return $response->withHeader('Location', '/')->withStatus(302);
         }
     });
 
 
-    $app->get('/urls/{id:[0-9]+}', function (Request $request, Response $response, array $args) use ($container) {
+    $app->get('/urls/{id:[0-9]+}', function (Request $request, Response $response, array $args) use ($container, $getFlashData) {
+        [$flash] = $getFlashData($container);
         $id = $args['id'];
         $pdo = $container->get(PDO::class);
-        $flash = $container->get('flash');
 
         $sql = 'SELECT * FROM urls WHERE id = :id';
         $stmt = $pdo->prepare($sql);
@@ -157,61 +166,56 @@ return function ($app, $container) {
     })->setName('urls.show');
 
 
-    $app->post(
-        '/urls/{url_id:[0-9]+}/checks',
-        function (Request $request, Response $response, array $args) use ($container) {
-            $id = $args['url_id'];
-            $pdo = $container->get(PDO::class);
-            $flash = $container->get('flash');
-            $client = $container->get(Client::class);
+    $app->post('/urls/{url_id:[0-9]+}/checks', function (Request $request, Response $response, array $args) use ($container) {
+        $id = $args['url_id'];
+        $pdo = $container->get(PDO::class);
+        $flash = $container->get('flash');
+        $client = $container->get(Client::class);
 
-            $sql = 'SELECT id, name FROM urls WHERE id = :id';
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute(['id' => $id]);
-            $urlData = $stmt->fetch();
+        $sql = 'SELECT id, name FROM urls WHERE id = :id';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(['id' => $id]);
+        $urlData = $stmt->fetch();
 
-            if (!$urlData) {
-                throw new \Slim\Exception\HttpNotFoundException($request);
-            }
-
-            $url = $urlData['name'];
-
-            try {
-                $httpResponse = $client->get($url, ['stream' => true, 'read_timeout' => 5]);
-                $statusCode = $httpResponse->getStatusCode();
-
-                $body = $httpResponse->getBody();
-                $html = $body->read(500000);
-                $body->close();
-
-                $crawler = new Crawler();
-                $crawler->addHtmlContent($html, 'UTF-8');
-
-                $title = trim($crawler->filter('title')->text(''));
-                $h1 = trim($crawler->filter('h1')->text(''));
-                $descNode = $crawler->filterXPath(
-                    '//meta[translate(@name, "DESCRIPTION", "description")="description"]'
-                );
-                $description = $descNode->count() > 0 ? trim($descNode->attr('content') ?? '') : '';
-
-                $sql = 'INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
-                VALUES (:url_id, :status_code, :h1, :title, :description, :created_at)';
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                    'url_id'      => $id,
-                    'status_code' => $statusCode,
-                    'h1'          => truncate($h1),
-                    'title'       => truncate($title),
-                    'description' => truncate($description),
-                    'created_at'  => Carbon::now(),
-                ]);
-
-                $flash->addMessage('success', 'Страница успешно проверена');
-            } catch (GuzzleException $e) {
-                $flash->addMessage('danger', 'Произошла ошибка при проверке, не удалось подключиться');
-            }
-
-            return $response->withHeader('Location', '/urls/' . $id)->withStatus(302);
+        if (!$urlData) {
+            throw new \Slim\Exception\HttpNotFoundException($request);
         }
-    )->setName('urls.checks');
+
+        $url = $urlData['name'];
+
+        try {
+            $httpResponse = $client->get($url, ['stream' => true, 'read_timeout' => 5]);
+            $statusCode = $httpResponse->getStatusCode();
+
+            $body = $httpResponse->getBody();
+            $html = $body->read(500000);
+            $body->close();
+
+            $crawler = new Crawler();
+            $crawler->addHtmlContent($html, 'UTF-8');
+
+            $title = trim($crawler->filter('title')->text(''));
+            $h1 = trim($crawler->filter('h1')->text(''));
+            $descNode = $crawler->filterXPath('//meta[translate(@name, "DESCRIPTION", "description")="description"]');
+            $description = $descNode->count() > 0 ? trim($descNode->attr('content') ?? '') : '';
+
+            $sql = 'INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
+                VALUES (:url_id, :status_code, :h1, :title, :description, :created_at)';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                'url_id'      => $id,
+                'status_code' => $statusCode,
+                'h1'          => truncate($h1),
+                'title'       => truncate($title),
+                'description' => truncate($description),
+                'created_at'  => Carbon::now(),
+            ]);
+
+            $flash->addMessage('success', 'Страница успешно проверена');
+        } catch (GuzzleException $e) {
+            $flash->addMessage('danger', 'Произошла ошибка при проверке, не удалось подключиться');
+        }
+
+        return $response->withHeader('Location', '/urls/' . $id)->withStatus(302);
+    })->setName('urls.checks');
 };
