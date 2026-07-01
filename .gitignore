@@ -6,3 +6,5 @@ info.txt
 .env
 .phpunit.cache/
 /build
+supervisord.log
+supervisord.pid
