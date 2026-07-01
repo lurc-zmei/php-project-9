@@ -85,6 +85,45 @@ class UrlAnalyzerTest extends TestCase
 
         $response = $this->app->handle($request);
 
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testPostValidUrl(): void
+    {
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/urls')
+            ->withParsedBody(['url' => 'https://example.com']);
+
+        $response = $this->app->handle($request);
+
         $this->assertEquals(302, $response->getStatusCode());
+
+        $stmt = $this->pdo->query('SELECT * FROM urls WHERE name = \'https://example.com\'');
+        $this->assertNotNull($stmt->fetch());
+    }
+
+    public function testPostExistingUrl(): void
+    {
+        $this->pdo->exec("INSERT INTO urls (name, created_at) VALUES ('https://example.com', '2026-07-01')");
+
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/urls')
+            ->withParsedBody(['url' => 'https://example.com']);
+
+        $response = $this->app->handle($request);
+
+        $this->assertEquals(302, $response->getStatusCode());
+
+        $stmt = $this->pdo->query('SELECT count(*) FROM urls');
+        $this->assertEquals(1, $stmt->fetchColumn());
+    }
+
+    public function testShowUrlPage(): void
+    {
+        $this->pdo->exec("INSERT INTO urls (name, created_at) VALUES ('https://example.com', '2026-07-01')");
+
+        $request = (new ServerRequestFactory())->createServerRequest('GET', '/urls/1');
+        $response = $this->app->handle($request);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertStringContainsString('https://example.com', (string)$response->getBody());
     }
 }

@@ -130,7 +130,14 @@ return function ($app, $container) {
     });
 
 
-    $app->get('/urls/{id:[0-9]+}', function (Request $request, Response $response, array $args) use ($container, $getFlashData) {
+    $app->get('/urls/{id:[0-9]+}', function (
+        Request $request,
+        Response $response,
+        array $args
+    ) use (
+        $container,
+        $getFlashData
+    ) {
         [$flash] = $getFlashData($container);
         $id = $args['id'];
         $pdo = $container->get(PDO::class);
@@ -166,7 +173,13 @@ return function ($app, $container) {
     })->setName('urls.show');
 
 
-    $app->post('/urls/{url_id:[0-9]+}/checks', function (Request $request, Response $response, array $args) use ($container) {
+    $app->post('/urls/{url_id:[0-9]+}/checks', function (
+        Request $request,
+        Response $response,
+        array $args
+    ) use (
+        $container
+    ) {
         $id = $args['url_id'];
         $pdo = $container->get(PDO::class);
         $flash = $container->get('flash');
