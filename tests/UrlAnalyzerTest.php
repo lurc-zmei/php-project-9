@@ -38,11 +38,11 @@ class UrlAnalyzerTest extends TestCase
         });
 
         $this->container->set(PDO::class, function () {
-            $host = $_ENV['DB_HOST'] ?? 'localhost';
-            $port = $_ENV['DB_PORT'] ?? '5432';
-            $name = $_ENV['DB_NAME'] ?? 'analyzer_test';
-            $user = $_ENV['DB_USERNAME'] ?? 'postgres';
-            $password = $_ENV['DB_PASSWORD'] ?? 'password';
+            $host = getenv('DB_HOST') ?: 'localhost';
+            $port = getenv('DB_PORT') ?: '5432';
+            $name = getenv('DB_NAME') ?: 'analyzer_test';
+            $user = getenv('DB_USERNAME') ?: 'postgres';
+            $password = getenv('DB_PASSWORD') ?: 'password';
 
             $dsn = "pgsql:host={$host};port={$port};dbname={$name}";
 

@@ -22,7 +22,24 @@ $container->set('flash', function () {
 });
 
 $container->set(PDO::class, function () {
-    $dsn = "pgsql:host={$_ENV['DB_HOST']};port={$_ENV['DB_PORT']};dbname={$_ENV['DB_NAME']}";
+    $dbUrl = getenv('DATABASE_URL');
+
+    if ($dbUrl) {
+        $parts = parse_url($dbUrl);
+        $host = $parts['host'];
+        $port = $parts['port'];
+        $db   = ltrim($parts['path'] ?? '', '/');
+        $user = $parts['user'];
+        $pass = $parts['pass'];
+    } else {
+        $host = getenv('DB_HOST');
+        $port = getenv('DB_PORT');
+        $db   = getenv('DB_NAME');
+        $user = getenv('DB_USERNAME');
+        $pass = getenv('DB_PASSWORD');
+    }
+
+    $dsn = "pgsql:host={$host};port={$port};dbname={$db}";
 
     $options = [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -30,21 +47,21 @@ $container->set(PDO::class, function () {
     ];
 
     try {
-        return new PDO($dsn, $_ENV['DB_USERNAME'], $_ENV['DB_PASSWORD'], $options);
+        return new PDO($dsn, $user, $pass, $options);
     } catch (\PDOException $e) {
         die("Ошибка подключения к БД: " . $e->getMessage());
     }
 });
 
 $container->set(Client::class, function () {
-    return new Client(['timeout' => 5,'connect_timeout' => 5]);
+    return new Client(['timeout' => 5, 'connect_timeout' => 5]);
 });
 
 
 AppFactory::setContainer($container);
 $app = AppFactory::create();
 
-$app->addErrorMiddleware(true, false, false);
+$app->addErrorMiddleware(false, false, false);
 
 $routes = require __DIR__ . '/../routes/routes.php';
 $routes($app, $container);
