@@ -66,13 +66,15 @@ return function ($app, $container) {
         $data = $request->getParsedBody();
         $url = trim($data['url'] ?? '');
 
-        if (empty($url)) {
-            $errors['url'][] = 'URL не должен быть пустым';
-        }
-
-
         $pdo = $container->get(PDO::class);
         $flash = $container->get('flash');
+
+        if (empty($url)) {
+            return $container->get(PhpRenderer::class)
+                ->render($response->withStatus(422), 'home.php', [
+                    'errors' => ['url' => ['URL не должен быть пустым']]
+                ]);
+        }
 
         $validator = new Validator(['url' => $url]);
         $validator->rule('lengthMax', 'url', 255)->message('URL превышает 255 символов');
@@ -81,10 +83,9 @@ return function ($app, $container) {
 
 
         if (!$validator->validate()) {
-            $errors = $validator->errors();
             return $container->get(PhpRenderer::class)
                 ->render($response->withStatus(422), 'home.php', [
-                    'errors' => $errors,
+                    'errors' => $validator->errors(),
                     'oldInput' => $url
                 ]);
         }
