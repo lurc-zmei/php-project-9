@@ -66,26 +66,26 @@ return function ($app, $container) {
         $data = $request->getParsedBody();
         $url = trim($data['url'] ?? '');
 
-        if (parse_url($url, PHP_URL_SCHEME) === null) {
-            $url = 'https://' . $url;
-        }
-
         $pdo = $container->get(PDO::class);
         $flash = $container->get('flash');
 
+        if (empty($url)) {
+            return $container->get(PhpRenderer::class)
+                ->render($response->withStatus(422), 'home.php', [
+                    'errors' => ['url' => ['URL не должен быть пустым']]
+                ]);
+        }
+
         $validator = new Validator(['url' => $url]);
-        $validator->rule('required', 'url')->message('URL не должен быть пустым');
         $validator->rule('lengthMax', 'url', 255)->message('URL превышает 255 символов');
-        $validator->rule('url', 'url')->message('Некорректный URL');
-        $validator->rule('regex', 'url', '/^https?:\/\/[^\s]+\.[a-z]{2,}(\/.*)?$/i')
-            ->message('URL должен содержать доменную зону (например, .com, .ru)');
+        $validator->rule('regex', 'url', '/^https?:\/\/[^\s]+$/i')
+            ->message('Некорректный URL');
 
 
         if (!$validator->validate()) {
-            $errors = $validator->errors();
             return $container->get(PhpRenderer::class)
                 ->render($response->withStatus(422), 'home.php', [
-                    'errors' => $errors,
+                    'errors' => $validator->errors(),
                     'oldInput' => $url
                 ]);
         }
@@ -197,11 +197,14 @@ return function ($app, $container) {
         $url = $urlData['name'];
 
         try {
-            $httpResponse = $client->get($url, ['stream' => true, 'read_timeout' => 5]);
+            $httpResponse = $client->get($url, [
+                'stream' => true,
+                'read_timeout' => 5,
+            ]);
             $statusCode = $httpResponse->getStatusCode();
 
             $body = $httpResponse->getBody();
-            $html = $body->read(500000);
+            $html = $body->read(800000);
             $body->close();
 
             $crawler = new Crawler();
@@ -209,7 +212,10 @@ return function ($app, $container) {
 
             $title = trim($crawler->filter('title')->text(''));
             $h1 = trim($crawler->filter('h1')->text(''));
-            $descNode = $crawler->filterXPath('//meta[translate(@name, "DESCRIPTION", "description")="description"]');
+            $descNode = $crawler->filterXPath('//meta[
+                translate(@name, "DESCRIPTION", "description")="description" 
+                or @property="og:description"
+            ]');
             $description = $descNode->count() > 0 ? trim($descNode->attr('content') ?? '') : '';
 
             $sql = 'INSERT INTO url_checks (url_id, status_code, h1, title, description, created_at)
