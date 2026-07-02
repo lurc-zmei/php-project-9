@@ -3,9 +3,10 @@ services:
     container_name: php
     build: .
     ports:
-      - "8000:80"
+      - "80:80"
     volumes:
       - .:/var/www/public_html
+      - /var/www/public_html/vendor
     env_file:
       - .env
     depends_on:
