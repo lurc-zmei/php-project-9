@@ -61,7 +61,7 @@ $container->set(Client::class, function () {
 AppFactory::setContainer($container);
 $app = AppFactory::create();
 
-$app->addErrorMiddleware(true, false, false);
+$app->addErrorMiddleware(false, false, false);
 
 $routes = require __DIR__ . '/../routes/routes.php';
 $routes($app, $container);
