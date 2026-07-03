@@ -1,0 +1,6 @@
+.git
+.github
+.env
+.phpunit.cache
+tests
+vendor

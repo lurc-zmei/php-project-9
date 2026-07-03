@@ -3,7 +3,7 @@ services:
     container_name: php
     build: .
     ports:
-      - "80:80"
+      - "80:8080"
     volumes:
       - .:/var/www/public_html
       - /var/www/public_html/vendor

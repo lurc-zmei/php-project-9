@@ -12,23 +12,30 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY nginx/vhost.conf /etc/nginx/sites-available/default
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/public_html
-
 COPY composer.json composer.lock ./
-
 RUN composer install --no-interaction --optimize-autoloader --no-scripts
 
-COPY . .
+COPY public/ ./public/
+COPY routes/ ./routes/
+COPY templates/ ./templates/
+COPY helpers.php ./
 
-RUN chown -R www-data:www-data /var/www/public_html
-
-EXPOSE 8080
+RUN mkdir -p /var/log/supervisor /var/lib/nginx /var/log/nginx /var/run /var/lib/php/sessions \
+    && chown -R www-data:www-data /var/log/supervisor /var/lib/nginx /var/log/nginx /var/run /var/lib/php/sessions /var/www/public_html /tmp
 
 RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf
 COPY php/www.conf /usr/local/etc/php-fpm.d/www.conf
+RUN chown www-data:www-data /usr/local/etc/php-fpm.d/www.conf
+
+RUN mkdir -p /tmp/client_body /tmp/fastcgi_temp /tmp/proxy_temp \
+    && chown -R www-data:www-data /tmp/client_body /tmp/fastcgi_temp /tmp/proxy_temp
+USER www-data
+EXPOSE 8080
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
