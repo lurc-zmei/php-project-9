@@ -148,7 +148,7 @@ return function ($app, $container) {
         $url = $stmt->fetch();
 
         if (!$url) {
-            throw new \Slim\Exception\HttpNotFoundException($request);
+            return $container->get(PhpRenderer::class)->render($response->withStatus(404), '404.php');
         }
 
         $url['created_at'] = formatDate($url['created_at']);
