@@ -6,7 +6,7 @@
             "App\\": "src/"
         },
         "files": [
-            "helpers.php"
+            "src/helpers.php"
         ]
     },
     "require": {
@@ -20,7 +20,9 @@
         "nesbot/carbon": "^3.13",
         "guzzlehttp/guzzle": "^7.12",
         "symfony/dom-crawler": "^8.1",
-        "symfony/css-selector": "^8.1"
+        "symfony/css-selector": "^8.1",
+        "ext-pdo": "*",
+        "ext-pdo_pgsql": "*"
     },
     "require-dev": {
         "squizlabs/php_codesniffer": "^4.0",

@@ -11,9 +11,9 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY nginx/vhost.conf /etc/nginx/sites-available/default
-COPY nginx/nginx.conf /etc/nginx/nginx.conf
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/nginx/vhost.conf /etc/nginx/sites-available/default
+COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -24,13 +24,13 @@ RUN composer install --no-interaction --optimize-autoloader --no-scripts
 COPY public/ ./public/
 COPY routes/ ./routes/
 COPY templates/ ./templates/
-COPY helpers.php ./
+COPY src/helpers.php ./
 
 RUN mkdir -p /var/log/supervisor /var/lib/nginx /var/log/nginx /var/run /var/lib/php/sessions \
     && chown -R www-data:www-data /var/log/supervisor /var/lib/nginx /var/log/nginx /var/run /var/lib/php/sessions /var/www/public_html /tmp
 
 RUN rm -f /usr/local/etc/php-fpm.d/zz-docker.conf
-COPY php/www.conf /usr/local/etc/php-fpm.d/www.conf
+COPY docker/php/www.conf /usr/local/etc/php-fpm.d/www.conf
 RUN chown www-data:www-data /usr/local/etc/php-fpm.d/www.conf
 
 RUN mkdir -p /tmp/client_body /tmp/fastcgi_temp /tmp/proxy_temp \

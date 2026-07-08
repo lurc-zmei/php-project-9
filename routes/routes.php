@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Routes;
+
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Views\PhpRenderer;
@@ -8,6 +10,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Symfony\Component\DomCrawler\Crawler;
 use Carbon\Carbon;
+use PDO;
 
 return function ($app, $container) {
     $getFlashData = function ($container) {
