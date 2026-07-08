@@ -25,7 +25,7 @@
 
 <h2 class="display-6 mt-5 mb-3">Проверки</h2>
 
-<form method="post" action="/urls/<?= $url['id'] ?>/checks" class="mb-4">
+<form method="post" action="<?= $router->urlFor('urls.checks', ['url_id' => $url['id']]) ?>" class="mb-4">
     <input class="btn btn-primary btn-lg px-4 text-uppercase" type="submit" value="Запустить проверку">
 </form>
 

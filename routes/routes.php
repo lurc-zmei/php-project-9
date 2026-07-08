@@ -13,6 +13,10 @@ use Carbon\Carbon;
 use PDO;
 
 return function ($app, $container) {
+    $getRouter = function () use ($container) {
+        return $container->get('renderer')->getAttribute('router');
+    };
+
     $getFlashData = function ($container) {
         $flash = $container->get('flash');
         $messages = $flash->getMessages();
@@ -24,7 +28,7 @@ return function ($app, $container) {
     $app->get('/', function (Request $request, Response $response) use ($container, $getFlashData) {
         [$flash, $oldInput] = $getFlashData($container);
 
-        return $container->get(PhpRenderer::class)->render($response, 'home.php', [
+        return $container->get('renderer')->render($response, 'pages/home.php', [
             'flash' => $flash,
             'oldInput' => $oldInput,
             'errors' => []
@@ -34,7 +38,7 @@ return function ($app, $container) {
 
     $app->get('/urls', function (Request $request, Response $response) use ($container, $getFlashData) {
         [$flash] = $getFlashData($container);
-        $pdo = $container->get(PDO::class);
+        $pdo = $container->get('pdo');
 
         $sql = 'SELECT
                 urls.id,
@@ -60,20 +64,20 @@ return function ($app, $container) {
             $rows[$key]['created_at'] = formatDate($row['created_at']);
         }
 
-        return $container->get(PhpRenderer::class)
-            ->render($response, 'index.php', ['rows' => $rows, 'flash' => $flash]);
+        return $container->get('renderer')
+            ->render($response, 'pages/index.php', ['rows' => $rows, 'flash' => $flash]);
     })->setName('urls.index');
 
 
-    $app->post('/urls', function (Request $request, Response $response) use ($container) {
+    $app->post('/urls', function (Request $request, Response $response) use ($container, $getRouter) {
         $data = $request->getParsedBody();
         $url = trim($data['url'] ?? '');
 
-        $pdo = $container->get(PDO::class);
+        $pdo = $container->get('pdo');
         $flash = $container->get('flash');
 
         if (empty($url)) {
-            return $container->get(PhpRenderer::class)
+            return $container->get('renderer')
                 ->render($response->withStatus(422), 'home.php', [
                     'errors' => ['url' => ['URL не должен быть пустым']]
                 ]);
@@ -84,9 +88,8 @@ return function ($app, $container) {
         $validator->rule('regex', 'url', '/^https?:\/\/[^\s]+$/i')
             ->message('Некорректный URL');
 
-
         if (!$validator->validate()) {
-            return $container->get(PhpRenderer::class)
+            return $container->get('renderer')
                 ->render($response->withStatus(422), 'home.php', [
                     'errors' => $validator->errors(),
                     'oldInput' => $url
@@ -105,7 +108,7 @@ return function ($app, $container) {
 
         if ($urlExist) {
             $flash->addMessage('success', 'Страница уже существует');
-            return $response->withHeader('Location', '/urls/' . $urlExist['id'])->withStatus(302);
+            return $response->withHeader('Location', $getRouter()->urlFor('urls.show', ['id' => $urlExist['id']]))->withStatus(302);
         }
 
         try {
@@ -117,18 +120,20 @@ return function ($app, $container) {
             ]);
             $newId = $pdo->lastInsertId();
             $flash->addMessage('success', 'Страница успешно добавлена');
-            return $response->withHeader('Location', '/urls/' . $newId)->withStatus(302);
+
+            return $response->withHeader('Location', $getRouter()->urlFor('urls.show', ['id' => $newId]))->withStatus(302);
         } catch (\PDOException $e) {
             if ($e->getCode() === '23505') {
                 $stmt = $pdo->prepare('SELECT id FROM urls WHERE name = :url');
                 $stmt->execute(['url' => $url]);
                 $existing = $stmt->fetch();
                 $flash->addMessage('warning', 'Страница уже существует');
-                return $response->withHeader('Location', '/urls/' . $existing['id'])->withStatus(302);
+
+                return $response->withHeader('Location', $getRouter()->urlFor('urls.show', ['id' => $existing['id']]))->withStatus(302);
             }
             $flash->addMessage('danger', 'Произошла ошибка при добавлении');
             $flash->addMessage('old_input', $url);
-            return $response->withHeader('Location', '/')->withStatus(302);
+            return $response->withHeader('Location', $getRouter()->urlFor('home'))->withStatus(302);
         }
     });
 
@@ -143,7 +148,7 @@ return function ($app, $container) {
     ) {
         [$flash] = $getFlashData($container);
         $id = $args['id'];
-        $pdo = $container->get(PDO::class);
+        $pdo = $container->get('pdo');
 
         $sql = 'SELECT * FROM urls WHERE id = :id';
         $stmt = $pdo->prepare($sql);
@@ -151,7 +156,7 @@ return function ($app, $container) {
         $url = $stmt->fetch();
 
         if (!$url) {
-            return $container->get(PhpRenderer::class)->render($response->withStatus(404), '404.php');
+            return $container->get('renderer')->render($response->withStatus(404), '404.php');
         }
 
         $url['created_at'] = formatDate($url['created_at']);
@@ -168,7 +173,7 @@ return function ($app, $container) {
             $checks[$key]['description'] = truncate($check['description']);
         }
 
-        return $container->get(PhpRenderer::class)->render($response, 'show.php', [
+        return $container->get('renderer')->render($response, 'pages/show.php', [
             'url' => $url,
             'checks' => $checks,
             'flash' => $flash
@@ -181,12 +186,13 @@ return function ($app, $container) {
         Response $response,
         array $args
     ) use (
-        $container
+        $container,
+        $getRouter
     ) {
         $id = $args['url_id'];
-        $pdo = $container->get(PDO::class);
+        $pdo = $container->get('pdo');
         $flash = $container->get('flash');
-        $client = $container->get(Client::class);
+        $client = $container->get('client');
 
         $sql = 'SELECT id, name FROM urls WHERE id = :id';
         $stmt = $pdo->prepare($sql);
@@ -238,6 +244,6 @@ return function ($app, $container) {
             $flash->addMessage('danger', 'Произошла ошибка при проверке, не удалось подключиться');
         }
 
-        return $response->withHeader('Location', '/urls/' . $id)->withStatus(302);
+        return $response->withHeader('Location', $getRouter()->urlFor('urls.show', ['id' => $id]))->withStatus(302);
     })->setName('urls.checks');
 };

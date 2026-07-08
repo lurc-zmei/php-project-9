@@ -3,7 +3,7 @@
         <h1 class="display-3"><?= htmlspecialchars($title ?? 'Анализатор страниц') ?></h1>
         <p class="lead">Бесплатно проверяйте сайты на SEO-пригодность</p>
 
-        <form action="/urls" method="post" class="row">
+        <form action="<?= $router->urlFor('urls.index') ?>" method="post" class="row">
             <div class="col-8">
                 <label for="url" class="visually-hidden">Url для проверки</label>
 

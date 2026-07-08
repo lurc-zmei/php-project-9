@@ -17,7 +17,7 @@
         <tr>
           <td><?= $row['id'] ?></td>
           <td>
-            <a href="/urls/<?= $row['id'] ?>" aria-label="Просмотр сайта <?= htmlspecialchars($row['name']) ?>"><?= htmlspecialchars($row['name']) ?></a>
+            <a href="<?= $router->urlFor('urls.show', ['id' => $row['id']]) ?>" aria-label="Просмотр сайта <?= htmlspecialchars($row['name']) ?>"><?= htmlspecialchars($row['name']) ?></a>
           </td>
           <td><?= htmlspecialchars($row['created_at']) ?></td>
           <td><?= $row['last_status_code'] ?? '' ?></td>

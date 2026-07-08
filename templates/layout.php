@@ -11,8 +11,8 @@
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid justify-content-start">
-            <a class="navbar-brand" href="/">Анализатор страниц</a>
-            <a class="nav-link link-light link-opacity-75" href="/urls">Сайты</a>
+            <a class="navbar-brand" href="<?= $router->urlFor('home') ?>">Анализатор страниц</a>
+            <a class="nav-link link-light link-opacity-75" href="<?= $router->urlFor('urls.index') ?>">Сайты</a>
         </div>
     </nav>
 

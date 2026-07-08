@@ -1,7 +1,5 @@
 <?php
 
-session_start();
-
 use Slim\Views\PhpRenderer;
 use Slim\Factory\AppFactory;
 use DI\Container;
@@ -10,18 +8,18 @@ use Dotenv\Dotenv;
 
 require __DIR__ . '/../vendor/autoload.php';
 
+session_start();
+
 $dotenv = Dotenv::createImmutable(dirname(__DIR__));
 $dotenv->safeLoad();
 
 $container = new Container();
 
-$container->set(PhpRenderer::class, new PhpRenderer(__DIR__ . '/../templates', [], 'layout.php'));
-
 $container->set('flash', function () {
     return new \Slim\Flash\Messages();
 });
 
-$container->set(PDO::class, function () {
+$container->set('pdo', function () {
     $dbUrl = getenv('DATABASE_URL');
 
     if ($dbUrl) {
@@ -53,13 +51,20 @@ $container->set(PDO::class, function () {
     }
 });
 
-$container->set(Client::class, function () {
+$container->set('client', function () {
     return new Client(['timeout' => 5, 'connect_timeout' => 5]);
 });
 
 
 AppFactory::setContainer($container);
 $app = AppFactory::create();
+
+
+$container->set('renderer', function () use ($app) {
+    $renderer = new PhpRenderer(__DIR__ . '/../templates', [], 'layout.php');
+    $renderer->addAttribute('router', $app->getRouteCollector()->getRouteParser());
+    return $renderer;
+});
 
 $app->addErrorMiddleware(true, false, false);
 

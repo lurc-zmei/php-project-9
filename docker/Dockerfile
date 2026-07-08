@@ -19,12 +19,12 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/public_html
 COPY composer.json composer.lock ./
-RUN composer install --no-interaction --optimize-autoloader --no-scripts
-
 COPY public/ ./public/
 COPY routes/ ./routes/
 COPY templates/ ./templates/
-COPY src/helpers.php ./
+COPY src/ ./src/
+
+RUN composer install --no-interaction --optimize-autoloader --no-scripts
 
 RUN mkdir -p /var/log/supervisor /var/lib/nginx /var/log/nginx /var/run /var/lib/php/sessions \
     && chown -R www-data:www-data /var/log/supervisor /var/lib/nginx /var/log/nginx /var/run /var/lib/php/sessions /var/www/public_html /tmp
