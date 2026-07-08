@@ -27,17 +27,13 @@ class UrlAnalyzerTest extends TestCase
 
         $this->container = new Container();
 
-        $this->container->set(\Slim\Views\PhpRenderer::class, new \Slim\Views\PhpRenderer(
-            __DIR__ . '/../templates',
-            [],
-            'layout.php'
-        ));
+        $this->container->set('renderer', null);
 
         $this->container->set('flash', function () {
             return new \Slim\Flash\Messages();
         });
 
-        $this->container->set(PDO::class, function () {
+        $this->container->set('pdo', function () {
             $host = getenv('DB_HOST') ?: 'localhost';
             $port = getenv('DB_PORT') ?: '5432';
             $name = getenv('DB_NAME') ?: 'analyzer_test';
@@ -52,18 +48,25 @@ class UrlAnalyzerTest extends TestCase
             ]);
         });
 
-        $this->container->set(Client::class, function () {
+        $this->container->set('client', function () {
             return new Client();
         });
 
-        $this->pdo = $this->container->get(PDO::class);
+        $this->pdo = $this->container->get('pdo');
 
         $this->pdo->exec('TRUNCATE TABLE url_checks RESTART IDENTITY CASCADE');
         $this->pdo->exec('TRUNCATE TABLE urls RESTART IDENTITY CASCADE');
 
         AppFactory::setContainer($this->container);
         $this->app = AppFactory::create();
-        $this->app->addErrorMiddleware(false, false, false);
+        $this->app->addErrorMiddleware(true, true, true);
+
+        // ИЗМЕНЕНИЕ: Теперь, когда $this->app создан, мы можем корректно настроить renderer
+        $this->container->set('renderer', function () {
+            $renderer = new \Slim\Views\PhpRenderer(__DIR__ . '/../templates', [], 'layout.php');
+            $renderer->addAttribute('router', $this->app->getRouteCollector()->getRouteParser());
+            return $renderer;
+        });
 
         $routes = require __DIR__ . '/../routes/routes.php';
         $routes($this->app, $this->container);

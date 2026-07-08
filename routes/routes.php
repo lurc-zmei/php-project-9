@@ -78,7 +78,7 @@ return function ($app, $container) {
 
         if (empty($url)) {
             return $container->get('renderer')
-                ->render($response->withStatus(422), 'home.php', [
+                ->render($response->withStatus(422), 'pages/home.php', [
                     'errors' => ['url' => ['URL не должен быть пустым']]
                 ]);
         }
@@ -90,7 +90,7 @@ return function ($app, $container) {
 
         if (!$validator->validate()) {
             return $container->get('renderer')
-                ->render($response->withStatus(422), 'home.php', [
+                ->render($response->withStatus(422), 'pages/home.php', [
                     'errors' => $validator->errors(),
                     'oldInput' => $url
                 ]);
@@ -108,7 +108,8 @@ return function ($app, $container) {
 
         if ($urlExist) {
             $flash->addMessage('success', 'Страница уже существует');
-            return $response->withHeader('Location', $getRouter()->urlFor('urls.show', ['id' => $urlExist['id']]))->withStatus(302);
+            return $response->withHeader('Location', $getRouter()
+                ->urlFor('urls.show', ['id' => $urlExist['id']]))->withStatus(302);
         }
 
         try {
@@ -121,7 +122,8 @@ return function ($app, $container) {
             $newId = $pdo->lastInsertId();
             $flash->addMessage('success', 'Страница успешно добавлена');
 
-            return $response->withHeader('Location', $getRouter()->urlFor('urls.show', ['id' => $newId]))->withStatus(302);
+            return $response->withHeader('Location', $getRouter()
+                ->urlFor('urls.show', ['id' => $newId]))->withStatus(302);
         } catch (\PDOException $e) {
             if ($e->getCode() === '23505') {
                 $stmt = $pdo->prepare('SELECT id FROM urls WHERE name = :url');
@@ -129,7 +131,8 @@ return function ($app, $container) {
                 $existing = $stmt->fetch();
                 $flash->addMessage('warning', 'Страница уже существует');
 
-                return $response->withHeader('Location', $getRouter()->urlFor('urls.show', ['id' => $existing['id']]))->withStatus(302);
+                return $response->withHeader('Location', $getRouter()
+                    ->urlFor('urls.show', ['id' => $existing['id']]))->withStatus(302);
             }
             $flash->addMessage('danger', 'Произошла ошибка при добавлении');
             $flash->addMessage('old_input', $url);
