@@ -66,7 +66,8 @@ $container->set('renderer', function () use ($app) {
     return $renderer;
 });
 
-$app->addErrorMiddleware(true, false, false);
+$errorMiddleware = $app->addErrorMiddleware(false, true, true);
+$errorMiddleware->setDefaultErrorHandler(getErrorHandler($app, $container));
 
 $routes = require __DIR__ . '/../routes/routes.php';
 $routes($app, $container);
