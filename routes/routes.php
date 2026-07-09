@@ -4,13 +4,10 @@ namespace App\Routes;
 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use Slim\Views\PhpRenderer;
 use Valitron\Validator;
-use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Symfony\Component\DomCrawler\Crawler;
 use Carbon\Carbon;
-use PDO;
 
 return function ($app, $container) {
     $getRouter = function () use ($container) {
@@ -19,25 +16,22 @@ return function ($app, $container) {
 
     $getFlashData = function ($container) {
         $flash = $container->get('flash');
-        $messages = $flash->getMessages();
-        $oldInput = $messages['old_input'][0] ?? '';
-        unset($messages['old_input']);
-        return [$messages, $oldInput];
+        return $flash->getMessages();
     };
 
     $app->get('/', function (Request $request, Response $response) use ($container, $getFlashData) {
-        [$flash, $oldInput] = $getFlashData($container);
+        $flash = $getFlashData($container);
 
         return $container->get('renderer')->render($response, 'pages/home.php', [
             'flash' => $flash,
-            'oldInput' => $oldInput,
+            'oldInput' => '',
             'errors' => []
         ]);
     })->setName('home');
 
 
     $app->get('/urls', function (Request $request, Response $response) use ($container, $getFlashData) {
-        [$flash] = $getFlashData($container);
+        $flash = $getFlashData($container);
         $pdo = $container->get('pdo');
 
         $sql = 'SELECT
@@ -79,14 +73,14 @@ return function ($app, $container) {
         if (empty($url)) {
             return $container->get('renderer')
                 ->render($response->withStatus(422), 'pages/home.php', [
-                    'errors' => ['url' => ['URL не должен быть пустым']]
+                    'errors' => ['url' => ['URL не должен быть пустым']],
+                    'oldInput' => $url
                 ]);
         }
 
         $validator = new Validator(['url' => $url]);
         $validator->rule('lengthMax', 'url', 255)->message('URL превышает 255 символов');
-        $validator->rule('regex', 'url', '/^https?:\/\/[^\s]+$/i')
-            ->message('Некорректный URL');
+        $validator->rule('regex', 'url', '/^https?:\/\/[^\s]+$/i')->message('Некорректный URL');
 
         if (!$validator->validate()) {
             return $container->get('renderer')
@@ -99,11 +93,11 @@ return function ($app, $container) {
         $parsedUrl = parse_url($url);
         $scheme = $parsedUrl['scheme'] ?? 'https';
         $host = $parsedUrl['host'] ?? '';
-        $url = strtolower("{$scheme}://{$host}");
+        $normalizedUrl = strtolower("{$scheme}://{$host}");
 
         $sql = 'SELECT id FROM urls WHERE name = :url';
         $stmt = $pdo->prepare($sql);
-        $stmt->execute(['url' => $url]);
+        $stmt->execute(['url' => $normalizedUrl]);
         $urlExist = $stmt->fetch();
 
         if ($urlExist) {
@@ -112,33 +106,19 @@ return function ($app, $container) {
                 ->urlFor('urls.show', ['id' => $urlExist['id']]))->withStatus(302);
         }
 
-        try {
-            $sql = 'INSERT INTO urls (name, created_at) VALUES (:url, :created_at)';
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([
-                'url' => $url,
-                'created_at' => Carbon::now()
-            ]);
-            $newId = $pdo->lastInsertId();
-            $flash->addMessage('success', 'Страница успешно добавлена');
+        $sql = 'INSERT INTO urls (name, created_at) VALUES (:url, :created_at)';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            'url' => $normalizedUrl,
+            'created_at' => Carbon::now()
+        ]);
 
-            return $response->withHeader('Location', $getRouter()
-                ->urlFor('urls.show', ['id' => $newId]))->withStatus(302);
-        } catch (\PDOException $e) {
-            if ($e->getCode() === '23505') {
-                $stmt = $pdo->prepare('SELECT id FROM urls WHERE name = :url');
-                $stmt->execute(['url' => $url]);
-                $existing = $stmt->fetch();
-                $flash->addMessage('warning', 'Страница уже существует');
+        $newId = $pdo->lastInsertId();
+        $flash->addMessage('success', 'Страница успешно добавлена');
 
-                return $response->withHeader('Location', $getRouter()
-                    ->urlFor('urls.show', ['id' => $existing['id']]))->withStatus(302);
-            }
-            $flash->addMessage('danger', 'Произошла ошибка при добавлении');
-            $flash->addMessage('old_input', $url);
-            return $response->withHeader('Location', $getRouter()->urlFor('home'))->withStatus(302);
-        }
-    });
+        return $response->withHeader('Location', $getRouter()
+            ->urlFor('urls.show', ['id' => $newId]))->withStatus(302);
+    })->setName('urls.store');
 
 
     $app->get('/urls/{id:[0-9]+}', function (
@@ -149,7 +129,7 @@ return function ($app, $container) {
         $container,
         $getFlashData
     ) {
-        [$flash] = $getFlashData($container);
+        $flash = $getFlashData($container);
         $id = $args['id'];
         $pdo = $container->get('pdo');
 
