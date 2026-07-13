@@ -9,6 +9,8 @@ use DI\Container;
 use PDO;
 use GuzzleHttp\Client;
 use Slim\Psr7\Factory\ServerRequestFactory;
+use Slim\Views\PhpRenderer;
+use Slim\Flash\Messages;
 
 class UrlAnalyzerTest extends TestCase
 {
@@ -20,17 +22,10 @@ class UrlAnalyzerTest extends TestCase
     {
         parent::setUp();
 
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        $_SESSION = [];
-
         $this->container = new Container();
 
-        $this->container->set('renderer', null);
-
         $this->container->set('flash', function () {
-            return new \Slim\Flash\Messages();
+            return new Messages();
         });
 
         $this->container->set('pdo', function () {
@@ -48,29 +43,37 @@ class UrlAnalyzerTest extends TestCase
             ]);
         });
 
+        $this->pdo = $this->container->get('pdo');
+
         $this->container->set('client', function () {
             return new Client();
         });
 
-        $this->pdo = $this->container->get('pdo');
-
-        $this->pdo->exec('TRUNCATE TABLE url_checks RESTART IDENTITY CASCADE');
-        $this->pdo->exec('TRUNCATE TABLE urls RESTART IDENTITY CASCADE');
+        $this->pdo->beginTransaction();
 
         AppFactory::setContainer($this->container);
         $this->app = AppFactory::create();
         $this->app->addErrorMiddleware(true, true, true);
 
-        // ИЗМЕНЕНИЕ: Теперь, когда $this->app создан, мы можем корректно настроить renderer
         $this->container->set('renderer', function () {
-            $renderer = new \Slim\Views\PhpRenderer(__DIR__ . '/../templates', [], 'layout.php');
+            $renderer = new PhpRenderer(__DIR__ . '/../templates', [], 'layout.php');
             $renderer->addAttribute('router', $this->app->getRouteCollector()->getRouteParser());
+            $renderer->addAttribute('flash', $this->container->get('flash')->getMessages());
             return $renderer;
         });
 
         $routes = require __DIR__ . '/../routes/routes.php';
         $routes($this->app, $this->container);
+
+        $_SESSION = [];
     }
+
+    protected function tearDown(): void
+    {
+        $this->pdo->rollBack();
+        parent::tearDown();
+    }
+
 
     public function testHomePage(): void
     {
@@ -122,8 +125,9 @@ class UrlAnalyzerTest extends TestCase
     public function testShowUrlPage(): void
     {
         $this->pdo->exec("INSERT INTO urls (name, created_at) VALUES ('https://example.com', '2026-07-01')");
+        $id = $this->pdo->lastInsertId();
 
-        $request = (new ServerRequestFactory())->createServerRequest('GET', '/urls/1');
+        $request = (new ServerRequestFactory())->createServerRequest('GET', "/urls/{$id}");
         $response = $this->app->handle($request);
 
         $this->assertEquals(200, $response->getStatusCode());

@@ -169,7 +169,7 @@ return function ($app, $container) {
         $urlData = $stmt->fetch();
 
         if (!$urlData) {
-            throw new \Slim\Exception\HttpNotFoundException($request);
+            throw new HttpNotFoundException($request);
         }
 
         $url = $urlData['name'];
