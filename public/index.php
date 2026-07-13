@@ -57,9 +57,11 @@ AppFactory::setContainer($container);
 $app = AppFactory::create();
 
 
-$container->set('renderer', function () use ($app) {
+$container->set('renderer', function () use ($app, $container) {
     $renderer = new PhpRenderer(__DIR__ . '/../templates', [], 'layout.php');
     $renderer->addAttribute('router', $app->getRouteCollector()->getRouteParser());
+    $renderer->addAttribute('flash', $container->get('flash')->getMessages());
+
     return $renderer;
 });
 

@@ -15,24 +15,15 @@ return function ($app, $container) {
         return $container->get('renderer')->getAttribute('router');
     };
 
-    $getFlashData = function ($container) {
-        $flash = $container->get('flash');
-        return $flash->getMessages();
-    };
-
-    $app->get('/', function (Request $request, Response $response) use ($container, $getFlashData) {
-        $flash = $getFlashData($container);
-
+    $app->get('/', function (Request $request, Response $response) use ($container) {
         return $container->get('renderer')->render($response, 'pages/home.php', [
-            'flash' => $flash,
             'oldInput' => '',
             'errors' => []
         ]);
     })->setName('home');
 
 
-    $app->get('/urls', function (Request $request, Response $response) use ($container, $getFlashData) {
-        $flash = $getFlashData($container);
+    $app->get('/urls', function (Request $request, Response $response) use ($container) {
         $pdo = $container->get('pdo');
 
         $sql = 'SELECT
@@ -60,7 +51,7 @@ return function ($app, $container) {
         }
 
         return $container->get('renderer')
-            ->render($response, 'pages/index.php', ['rows' => $rows, 'flash' => $flash]);
+            ->render($response, 'pages/index.php', ['rows' => $rows]);
     })->setName('urls.index');
 
 
@@ -127,10 +118,8 @@ return function ($app, $container) {
         Response $response,
         array $args
     ) use (
-        $container,
-        $getFlashData
+        $container
     ) {
-        $flash = $getFlashData($container);
         $id = $args['id'];
         $pdo = $container->get('pdo');
 
@@ -152,15 +141,11 @@ return function ($app, $container) {
 
         foreach ($checks as $key => $check) {
             $checks[$key]['created_at'] = formatDate($check['created_at']);
-            $checks[$key]['h1'] = truncate($check['h1']);
-            $checks[$key]['title'] = truncate($check['title']);
-            $checks[$key]['description'] = truncate($check['description']);
         }
 
         return $container->get('renderer')->render($response, 'pages/show.php', [
             'url' => $url,
-            'checks' => $checks,
-            'flash' => $flash
+            'checks' => $checks
         ]);
     })->setName('urls.show');
 
