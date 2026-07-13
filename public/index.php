@@ -5,6 +5,7 @@ use Slim\Factory\AppFactory;
 use DI\Container;
 use GuzzleHttp\Client;
 use Dotenv\Dotenv;
+use Slim\Flash\Messages;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -16,7 +17,7 @@ $dotenv->safeLoad();
 $container = new Container();
 
 $container->set('flash', function () {
-    return new \Slim\Flash\Messages();
+    return new Messages();
 });
 
 $container->set('pdo', function () {
@@ -44,11 +45,7 @@ $container->set('pdo', function () {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ];
 
-    try {
-        return new PDO($dsn, $user, $pass, $options);
-    } catch (\PDOException $e) {
-        die("Ошибка подключения к БД: " . $e->getMessage());
-    }
+    return new PDO($dsn, $user, $pass, $options);
 });
 
 $container->set('client', function () {

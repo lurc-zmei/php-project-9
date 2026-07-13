@@ -8,6 +8,7 @@ use Valitron\Validator;
 use GuzzleHttp\Exception\GuzzleException;
 use Symfony\Component\DomCrawler\Crawler;
 use Carbon\Carbon;
+use Slim\Exception\HttpNotFoundException;
 
 return function ($app, $container) {
     $getRouter = function () use ($container) {
@@ -139,7 +140,7 @@ return function ($app, $container) {
         $url = $stmt->fetch();
 
         if (!$url) {
-            throw new \Slim\Exception\HttpNotFoundException($request);
+            throw new HttpNotFoundException($request);
         }
 
         $url['created_at'] = formatDate($url['created_at']);
