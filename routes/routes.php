@@ -26,10 +26,10 @@ return function ($app, $container) {
     $app->get('/urls', function (Request $request, Response $response) use ($container) {
         $pdo = $container->get('pdo');
 
-        $sqlUrls = $pdo->query('SELECT id, name, created_at FROM urls');
+        $sqlUrls = $pdo->query('SELECT id, name, created_at FROM urls ORDER BY id DESC');
         $urls = $sqlUrls->fetchAll();
 
-        $sqlChecks = $pdo->query('SELECT DISTINCT ON (url_id) * FROM url_checks order by url_id DESC, id DESC');
+        $sqlChecks = $pdo->query('SELECT DISTINCT ON (url_id) * FROM url_checks ORDER BY url_id, id DESC');
         $checks = $sqlChecks->fetchAll();
 
         $checksById = [];
