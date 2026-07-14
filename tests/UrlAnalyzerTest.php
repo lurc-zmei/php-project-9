@@ -11,6 +11,9 @@ use GuzzleHttp\Client;
 use Slim\Psr7\Factory\ServerRequestFactory;
 use Slim\Views\PhpRenderer;
 use Slim\Flash\Messages;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
 
 class UrlAnalyzerTest extends TestCase
 {
@@ -22,31 +25,42 @@ class UrlAnalyzerTest extends TestCase
     {
         parent::setUp();
 
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_destroy();
+        }
+        session_start();
+        $_SESSION = [];
+
         $this->container = new Container();
 
         $this->container->set('flash', function () {
             return new Messages();
         });
 
+        $host = getenv('DB_HOST') ?: 'localhost';
+        $port = getenv('DB_PORT') ?: '5432';
+        $name = getenv('DB_NAME') ?: 'analyzer_test';
+        $user = getenv('DB_USERNAME') ?: 'postgres';
+        $password = getenv('DB_PASSWORD') ?: 'password';
+
+        $dsn = "pgsql:host={$host};port={$port};dbname={$name}";
+        $this->pdo = new PDO($dsn, $user, $password, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+
         $this->container->set('pdo', function () {
-            $host = getenv('DB_HOST') ?: 'localhost';
-            $port = getenv('DB_PORT') ?: '5432';
-            $name = getenv('DB_NAME') ?: 'analyzer_test';
-            $user = getenv('DB_USERNAME') ?: 'postgres';
-            $password = getenv('DB_PASSWORD') ?: 'password';
-
-            $dsn = "pgsql:host={$host};port={$port};dbname={$name}";
-
-            return new PDO($dsn, $user, $password, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            ]);
+            return $this->pdo;
         });
 
-        $this->pdo = $this->container->get('pdo');
+        $mockHandler = new MockHandler([
+            new Response(200, [], '<html><title>Тестовый сайт</title><body>Содержимое</body></html>')
+        ]);
+        $handlerStack = HandlerStack::create($mockHandler);
+        $mockClient = new Client(['handler' => $handlerStack]);
 
-        $this->container->set('client', function () {
-            return new Client();
+        $this->container->set('client', function () use ($mockClient) {
+            return $mockClient;
         });
 
         $this->pdo->beginTransaction();
@@ -64,8 +78,6 @@ class UrlAnalyzerTest extends TestCase
 
         $routes = require __DIR__ . '/../routes/routes.php';
         $routes($this->app, $this->container);
-
-        $_SESSION = [];
     }
 
     protected function tearDown(): void
@@ -105,6 +117,11 @@ class UrlAnalyzerTest extends TestCase
 
         $stmt = $this->pdo->query('SELECT * FROM urls WHERE name = \'https://example.com\'');
         $this->assertNotNull($stmt->fetch());
+
+        $flash = new Messages();
+        $messages = $flash->getMessages();
+        $this->assertArrayHasKey('success', $messages);
+        $this->assertStringContainsString('Страница успешно добавлена', $messages['success'][0]);
     }
 
     public function testPostExistingUrl(): void
@@ -120,6 +137,11 @@ class UrlAnalyzerTest extends TestCase
 
         $stmt = $this->pdo->query('SELECT count(*) FROM urls');
         $this->assertEquals(1, $stmt->fetchColumn());
+
+        $flash = new Messages();
+        $messages = $flash->getMessages();
+        $this->assertArrayHasKey('success', $messages);
+        $this->assertStringContainsString('Страница уже существует', $messages['success'][0]);
     }
 
     public function testShowUrlPage(): void
