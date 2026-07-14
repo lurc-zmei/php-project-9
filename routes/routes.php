@@ -26,28 +26,24 @@ return function ($app, $container) {
     $app->get('/urls', function (Request $request, Response $response) use ($container) {
         $pdo = $container->get('pdo');
 
-        $sql = 'SELECT
-                urls.id,
-                urls.name,
-                urls.created_at,
-                url_checks.status_code AS last_status_code,
-                url_checks.created_at AS last_check_created_at
-            FROM urls
-            LEFT JOIN (
-                SELECT DISTINCT ON (url_id) 
-                    url_id, 
-                    status_code, 
-                    created_at
-                FROM url_checks
-                ORDER BY url_id, id DESC
-            ) url_checks ON urls.id = url_checks.url_id
-            ORDER BY id DESC';
+        $sqlUrls = $pdo->query('SELECT id, name, created_at FROM urls');
+        $urls = $sqlUrls->fetchAll();
 
-        $stmt = $pdo->query($sql);
-        $rows = $stmt->fetchAll();
+        $sqlChecks = $pdo->query('SELECT DISTINCT ON (url_id) * FROM url_checks order by url_id DESC, id DESC');
+        $checks = $sqlChecks->fetchAll();
 
-        foreach ($rows as $key => $row) {
-            $rows[$key]['created_at'] = formatDate($row['created_at']);
+        $checksById = [];
+        foreach ($checks as $check) {
+            $checksById[$check['url_id']] = $check;
+        }
+
+        $rows = [];
+        foreach ($urls as $row) {
+            $row['created_at'] = formatDate($row['created_at']);
+            $row['last_status_code'] = $checksById[$row['id']]['status_code'] ?? '';
+            $row['last_check_created_at'] = $checksById[$row['id']]['created_at'] ?? '';
+
+            $rows[] = $row;
         }
 
         return $container->get('renderer')
