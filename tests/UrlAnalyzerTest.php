@@ -34,7 +34,12 @@ class UrlAnalyzerTest extends TestCase
         $this->container = new Container();
 
         $this->container->set('flash', function () {
-            return new Messages();
+            return new class extends Messages {
+                public function getMessages(): array
+                {
+                    return $_SESSION['slimFlash'] ?? [];
+                }
+            };
         });
 
         $host = getenv('DB_HOST') ?: 'localhost';
@@ -86,7 +91,6 @@ class UrlAnalyzerTest extends TestCase
         parent::tearDown();
     }
 
-
     public function testHomePage(): void
     {
         $request = (new ServerRequestFactory())->createServerRequest('GET', '/');
@@ -118,7 +122,7 @@ class UrlAnalyzerTest extends TestCase
         $stmt = $this->pdo->query('SELECT * FROM urls WHERE name = \'https://example.com\'');
         $this->assertNotNull($stmt->fetch());
 
-        $flash = new Messages();
+        $flash = $this->container->get('flash');
         $messages = $flash->getMessages();
         $this->assertArrayHasKey('success', $messages);
         $this->assertStringContainsString('Страница успешно добавлена', $messages['success'][0]);
