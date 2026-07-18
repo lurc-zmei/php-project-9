@@ -142,7 +142,7 @@ class UrlAnalyzerTest extends TestCase
         $stmt = $this->pdo->query('SELECT count(*) FROM urls');
         $this->assertEquals(1, $stmt->fetchColumn());
 
-        $flash = new Messages();
+        $flash = $this->container->get('flash');
         $messages = $flash->getMessages();
         $this->assertArrayHasKey('success', $messages);
         $this->assertStringContainsString('Страница уже существует', $messages['success'][0]);
@@ -158,5 +158,47 @@ class UrlAnalyzerTest extends TestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertStringContainsString('https://example.com', (string)$response->getBody());
+    }
+
+    public function testUrlsIndexPage(): void
+    {
+        $this->pdo->exec("INSERT INTO urls (name, created_at) VALUES ('https://example.com', '2026-07-01')");
+
+        $request = (new ServerRequestFactory())->createServerRequest('GET', '/urls');
+        $response = $this->app->handle($request);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertStringContainsString('https://example.com', (string)$response->getBody());
+    }
+
+    public function testShowNonExistingUrlPage(): void
+    {
+        $request = (new ServerRequestFactory())->createServerRequest('GET', '/urls/99999');
+        $response = $this->app->handle($request);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testCreateUrlCheck(): void
+    {
+        $this->pdo->exec("INSERT INTO urls (name, created_at) VALUES ('https://example.com', '2026-07-01')");
+        $id = $this->pdo->lastInsertId();
+
+        $request = (new ServerRequestFactory())->createServerRequest('POST', "/urls/{$id}/checks");
+        $response = $this->app->handle($request);
+
+        $this->assertEquals(302, $response->getStatusCode());
+
+        $stmt = $this->pdo->query("SELECT * FROM url_checks WHERE url_id = {$id}");
+        $check = $stmt->fetch();
+
+        $this->assertNotNull($check);
+        $this->assertEquals(200, $check['status_code']);
+        $this->assertEquals('Тестовый сайт', $check['title']);
+
+        $flash = $this->container->get('flash');
+        $messages = $flash->getMessages();
+        $this->assertArrayHasKey('success', $messages);
+        $this->assertStringContainsString('Страница успешно проверена', $messages['success'][0]);
     }
 }
